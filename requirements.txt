@@ -1,0 +1,9 @@
+transformers
+torch
+requests
+Pillow
+open_clip_torch
+ftfy
+
+# This is only needed for local deployment
+gradio
