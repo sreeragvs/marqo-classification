@@ -22,7 +22,8 @@ def _patched_set_model_device_and_precision(model, device, precision, is_timm_mo
             model.apply(_convert_ln)
         else:
             model = model.to_empty(device=device)
-            open_clip.factory.convert_weights_to_lp(model, dtype=dtype)
+            if hasattr(open_clip.factory, "convert_weights_to_lp"):
+                open_clip.factory.convert_weights_to_lp(model, dtype=dtype)
 
     elif precision in ("pure_fp16", "pure_bf16"):
         dtype = torch.float16 if 'fp16' in precision else torch.bfloat16
@@ -37,10 +38,11 @@ def _patched_set_model_device_and_precision(model, device, precision, is_timm_mo
 open_clip.factory._set_model_device_and_precision = _patched_set_model_device_and_precision
 
 # ----- Load model and processor -----
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 fashion_items = ['top', 'trousers', 'jumper', 'briefs']
 
 model_name = 'Marqo/marqo-fashionSigLIP'
-model = AutoModel.from_pretrained(model_name, trust_remote_code=True)
+model = AutoModel.from_pretrained(model_name, trust_remote_code=True).to(device)
 processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
 
 # ----- Preprocess text -----
@@ -50,8 +52,8 @@ with torch.no_grad():
         return_tensors="pt",
         truncation=True,
         padding=True
-    )['input_ids']
-    text_features = model.get_text_features(processed_texts)
+    ).to(device)
+    text_features = model.get_text_features(**processed_texts)
     text_features = text_features / text_features.norm(dim=-1, keepdim=True)
 
 # ----- Prediction function -----
@@ -64,7 +66,7 @@ def predict_from_url(url):
     except Exception as e:
         return {"Error": f"Failed to load image: {str(e)}"}
 
-    processed_image = processor(images=image, return_tensors="pt")['pixel_values']
+    processed_image = processor(images=image, return_tensors="pt")['pixel_values'].to(device)
 
     with torch.no_grad():
         image_features = model.get_image_features(processed_image)
