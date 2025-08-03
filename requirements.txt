@@ -1,4 +1,0 @@
-transformers
-gradio
-torch
-marqo
